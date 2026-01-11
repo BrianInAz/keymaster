@@ -1,5 +1,5 @@
-// Keymaster - Secure TouchID access to Keychain secrets
-// Enhanced version for bjzy.me vault integration
+// Keymaster - Simple TouchID access to Keychain secrets
+// Based on original working version
 //
 import Foundation
 import LocalAuthentication
@@ -7,12 +7,10 @@ import LocalAuthentication
 let policy = LAPolicy.deviceOwnerAuthenticationWithBiometrics
 
 func setPassword(key: String, password: String) -> Bool {
-  // Add biometric protection to the keychain item
   let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
     kSecAttrService as String: key,
-    kSecValueData as String: password.data(using: .utf8) ?? Data(),
-    kSecAttrAccessControl as String: createAccessControl()
+    kSecValueData as String: password.data(using: .utf8) ?? Data()
   ]
 
   // Delete existing item first to prevent duplicates
@@ -20,17 +18,6 @@ func setPassword(key: String, password: String) -> Bool {
   
   let status = SecItemAdd(query as CFDictionary, nil)
   return status == errSecSuccess
-}
-
-func createAccessControl() -> SecAccessControl {
-  var error: Unmanaged<CFError>?
-  let access = SecAccessControlCreateWithFlags(
-    nil,
-    kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-    .userPresence,
-    &error
-  )
-  return access!
 }
 
 func deletePassword(key: String) -> Bool {
@@ -58,12 +45,12 @@ func getPassword(key: String) -> String? {
     let password = String(data: passwordData, encoding: String.Encoding.utf8)
   else { return nil }
 
-  return password
+  return password.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 func readPassword() -> String {
   let password = readLine(strippingNewline: true) ?? ""
-  return password
+  return password.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 func usage() {
@@ -85,10 +72,10 @@ func main() {
   let key = inputArgs[1]
   var secret = ""
   
-  // Enhanced security: read password from stdin for 'set' operation
+  // Read password from stdin for 'set' operation
   if (action == "set") {
     if inputArgs.count == 3 {
-      // Legacy mode: password as argument (less secure)
+      // Legacy mode: password as argument
       fputs("Warning: Password passed as argument is visible in process list\n", stderr)
       secret = inputArgs[2]
     } else {
@@ -108,7 +95,7 @@ func main() {
   }
 
   if (action == "set") {
-    context.evaluatePolicy(policy, localizedReason: "set to your password") { success, error in
+    context.evaluatePolicy(policy, localizedReason: "Keymaster: store vault password") { success, error in
       guard setPassword(key: key, password: secret) else {
         print("Error setting password")
         exit(EXIT_FAILURE)
@@ -120,13 +107,13 @@ func main() {
   }
 
   if (action == "get") {
-    context.evaluatePolicy(policy, localizedReason: "access to your password") { success, error in
+    context.evaluatePolicy(policy, localizedReason: "Keymaster: unlock vault password") { success, error in
       if success && error == nil {
         guard let password = getPassword(key: key) else {
           print("Error getting password")
           exit(EXIT_FAILURE)
         }
-        print(password)
+        print(password, terminator: "")
         exit(EXIT_SUCCESS)
       } else {
         let errorDescription = error?.localizedDescription ?? "Unknown error"
@@ -138,7 +125,7 @@ func main() {
   }
 
   if (action == "delete") {
-    context.evaluatePolicy(policy, localizedReason: "delete your password") { success, error in
+    context.evaluatePolicy(policy, localizedReason: "Keymaster: delete vault password") { success, error in
       if success && error == nil {
         guard deletePassword(key: key) else {
           print("Error deleting password")
