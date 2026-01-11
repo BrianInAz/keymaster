@@ -89,11 +89,11 @@ func main() {
   if (action == "set") {
     if inputArgs.count == 3 {
       // Legacy mode: password as argument (less secure)
-      print("Warning: Password passed as argument is visible in process list", to: &stderr)
+      fputs("Warning: Password passed as argument is visible in process list\n", stderr)
       secret = inputArgs[2]
     } else {
       // Secure mode: read from stdin
-      print("Enter password (will not echo):", to: &stderr)
+      fputs("Enter password (will not echo):\n", stderr)
       secret = readPassword()
     }
   }
